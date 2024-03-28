@@ -65,7 +65,7 @@ def packet_callback(packet):
             # Checks for irregular activity from IP (Attempting to reach many sockets in short amount of time)
             check_suspicious(src_ip)
     
-    # Call DDoS detection method
+    # Checks for possible DDoS attacks
     check_ddos()
 
 packet_count = 0
