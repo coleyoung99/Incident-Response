@@ -45,7 +45,7 @@ def check_ddos():
     global packet_count, last_check_time
     packet_count += 1
     current_time = time.time()
-    if current_time - last_check_time >= 30:  # Check every 30 seconds
+    if current_time - last_check_time >= 30:
         if packet_count > 17000:
             send_email("Network traffic spike detected, sending email")
         packet_count = 0
