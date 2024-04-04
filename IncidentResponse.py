@@ -119,4 +119,5 @@ echo_requests = []
 threading.Thread(target=sniff, kwargs={'prn': packet_callback, 'store': False}).start()
 threading.Thread(target=sniff, kwargs={'filter': "icmp", 'prn': detect_ping_flood}).start()
 threading.Thread(target=sniff, kwargs={'filter': "tcp", 'prn': detect_syn_flood}).start()
+threading.Thread(target=sniff, kwargs={'filter': "arp", 'prn': analyze_arp_packets}).start()
 threading.Thread(target=check_ddos).start()
