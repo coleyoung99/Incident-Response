@@ -40,7 +40,8 @@ def check_suspicious(ip):
             # Threshold for detecting suspicious activity
             if time_diff < 10:
                 print("Suspicious activity detected")
-                send_email(f"Suspicious activity detected from {ip}:{len(connection_attempts[ip])} connection attempts in {time_diff} seconds.")
+                send_email(f"Suspicious activity detected from {ip}:{len(connection_attempts[ip])} connection attempts in {time_diff} seconds.", time.time())
+
                 
 # Function to check for possible ARP poisoning
 def analyze_arp_packets(packet):
