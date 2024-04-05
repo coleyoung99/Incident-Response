@@ -30,7 +30,7 @@ def send_email(message):
         print("Email could not be sent:", str(e))
     finally:
         server.quit()
-
+"""" Too many false detections, going to focus on actual attacks
 # Function to check for suspicious activity
 def check_suspicious(ip):
     if ip in connection_attempts:
@@ -41,7 +41,7 @@ def check_suspicious(ip):
             if time_diff < 10:
                 print("Suspicious activity detected")
                 send_email("Suspicious activity detected from {0}:{1} connection attempts in {2} seconds.".format(ip, len(connection_attempts[ip]), time_diff))
-
+"""
 # Function to check for possible ARP poisoning
 def analyze_arp_packets(packet):
     if ARP in packet:
@@ -93,6 +93,7 @@ def detect_syn_flood(packet):
             print("Possible TCP SYN flooding attack detected")
             send_email("Possible TCP SYN flooding attack detected from source: {0}".format(src_ip))
 
+"""""
 # Callback function to handle received packets
 def packet_callback(packet):
     if IP in packet:
@@ -106,7 +107,7 @@ def packet_callback(packet):
             
             # Checks for irregular activity from IP (Attempting to reach many sockets in short amount of time)
             check_suspicious(src_ip)
-
+"""""
 # Initialize global variables
 packet_count = 0
 connection_attempts = {}
@@ -116,7 +117,7 @@ syn_packets = {}
 echo_requests = []
 
 # Create threads for each function
-threading.Thread(target=sniff, kwargs={'prn': packet_callback, 'store': False}).start()
+#threading.Thread(target=sniff, kwargs={'prn': packet_callback, 'store': False}).start()
 threading.Thread(target=sniff, kwargs={'filter': "icmp", 'prn': detect_ping_flood}).start()
 threading.Thread(target=sniff, kwargs={'filter': "tcp", 'prn': detect_syn_flood}).start()
 threading.Thread(target=sniff, kwargs={'filter': "arp", 'prn': analyze_arp_packets}).start()
