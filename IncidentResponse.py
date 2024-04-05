@@ -40,9 +40,8 @@ def check_suspicious(ip):
             # Threshold for detecting suspicious activity
             if time_diff < 10:
                 print("Suspicious activity detected")
-                send_email(f"Suspicious activity detected from {ip}:{len(connection_attempts[ip])} connection attempts in {time_diff} seconds.", time.time())
+                send_email("Suspicious activity detected from {0}:{1} connection attempts in {2} seconds.".format(ip, len(connection_attempts[ip]), time_diff))
 
-                
 # Function to check for possible ARP poisoning
 def analyze_arp_packets(packet):
     if ARP in packet:
@@ -53,7 +52,7 @@ def analyze_arp_packets(packet):
             actual_mac = getmacbyip(sender_ip)
             if actual_mac is not None and actual_mac != sender_mac:
                 print("Possible ARP poisoning detected")
-                send_email("Possible ARP poisoning detected from IP", sender_ip)
+                send_email("Possible ARP poisoning detected from IP {0}".format(sender_ip))
                 
 # Function to check for possible ICMP ping flood attack
 def detect_ping_flood(packet):
@@ -66,7 +65,7 @@ def detect_ping_flood(packet):
             time_difference = echo_requests[-1] - echo_requests[0]
             if time_difference <= 10:
                 print("Possible ping flood detected")
-                send_email(f"Possible ping flood detected from source: {packet[IP].src}")
+                send_email("Possible ping flood detected from source: {0}".format(packet[IP].src))
 
 # Function to check for possible UDP DDoS attack
 def check_ddos():
@@ -92,7 +91,7 @@ def detect_syn_flood(packet):
             syn_packets[src_ip] += 1
         if syn_packets[src_ip] > 20:  # Modify threshold as needed
             print("Possible TCP SYN flooding attack detected")
-            send_email(f"Possible TCP SYN flooding attack detected from source: {src_ip}")
+            send_email("Possible TCP SYN flooding attack detected from source: {0}".format(src_ip))
 
 # Callback function to handle received packets
 def packet_callback(packet):
