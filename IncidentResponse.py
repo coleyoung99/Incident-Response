@@ -3,122 +3,91 @@ import smtplib
 from collections import deque
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from scapy.all import sniff, IP, TCP, ARP, getmacbyip, ICMP
-import threading
+from scapy.all import sniff, IP, TCP, UDP, ICMP
 import time
 
-# Currently looks for DDoS, irregular activity from an IP
-# Maybe examine payloads, protocols, DNS tunneling.
-
-def send_email(message):
+def send_email(message, time_str):
     msg = MIMEMultipart()
     msg['From'] = "coleturneryoung2@gmail.com"
     msg['To'] = "coleturneryoung@gmail.com"
-    msg['Subject'] = "Warning Irregular Activity"
-    
+    msg['Subject'] = "Warning Irregular Activity - {}".format(time_str)
+   
     msg.attach(MIMEText(message, 'plain'))
-    
+   
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login("coleturneryoung2@gmail.com", "oxtu hwru wlhd uqvx")
         text = msg.as_string()
         server.sendmail("coleturneryoung2@gmail.com", "coleturneryoung@gmail.com", text)
-        
+       
         print("Email sent successfully!")
     except Exception as e:
         print("Email could not be sent:", str(e))
     finally:
         server.quit()
-"""" Too many false detections, going to focus on actual attacks
-# Function to check for suspicious activity
-def check_suspicious(ip):
-    if ip in connection_attempts:
-        if len(connection_attempts[ip]) > 1:
-            # Calculate time difference between first and last connection attempt
-            time_diff = connection_attempts[ip][-1] - connection_attempts[ip][0]
-            # Threshold for detecting suspicious activity
-            if time_diff < 10:
-                print("Suspicious activity detected")
-                send_email("Suspicious activity detected from {0}:{1} connection attempts in {2} seconds.".format(ip, len(connection_attempts[ip]), time_diff))
-"""
-# Function to check for possible ARP poisoning
-def analyze_arp_packets(packet):
-    if ARP in packet:
-        arp_packet = packet[ARP]
-        if arp_packet.op == 2:
-            sender_ip = arp_packet.psrc
-            sender_mac = arp_packet.hwsrc
-            actual_mac = getmacbyip(sender_ip)
-            if actual_mac is not None and actual_mac != sender_mac:
-                print("Possible ARP poisoning detected")
-                send_email("Possible ARP poisoning detected from IP {0}".format(sender_ip))
-                
-# Function to check for possible ICMP ping flood attack
-def detect_ping_flood(packet):
-    global echo_requests
-    # ICMP type 8 is echo request
-    if ICMP in packet and packet[ICMP].type == 8:
-        echo_requests.append(time.time())
-        
-        if len(echo_requests) >= 10:
-            time_difference = echo_requests[-1] - echo_requests[0]
-            if time_difference <= 10:
-                print("Possible ping flood detected")
-                send_email("Possible ping flood detected from source: {0}".format(packet[IP].src))
 
-# Function to check for possible UDP DDoS attack
-def check_ddos():
-    global packet_count, last_check_time
-    while True:
-        packet_count += 1
-        current_time = time.time()
-        if current_time - last_check_time >= 30:
-            if packet_count > 3:
-                print("Possible DDoS detected")
-                send_email("Network traffic spike detected, sending email")
-            packet_count = 0
-            last_check_time = current_time
-
-# Function to check for possible TCP SYN flooding attack
-def detect_syn_flood(packet):
-    global syn_packets
-    if TCP in packet and packet[TCP].flags & 2:  # Check if it's a SYN packet
+def detect_attack(packet):
+    global echo_requests, syn_packets, tcp_reset_counts, ping_of_death_ips
+   
+    # Check if packet contains IP layer
+    if packet.haslayer(IP):
         src_ip = packet[IP].src
-        if src_ip not in syn_packets:
-            syn_packets[src_ip] = 1
-        else:
-            syn_packets[src_ip] += 1
-        if syn_packets[src_ip] > 20:  # Modify threshold as needed
-            print("Possible TCP SYN flooding attack detected")
-            send_email("Possible TCP SYN flooding attack detected from source: {0}".format(src_ip))
 
-"""""
-# Callback function to handle received packets
-def packet_callback(packet):
-    if IP in packet:
-        src_ip = packet[IP].src
-        if TCP in packet:
-            dst_port = packet[TCP].dport
-            # Track connection attempts per IP
-            if src_ip not in connection_attempts:
-                connection_attempts[src_ip] = []
-            connection_attempts[src_ip].append(time.time())
-            
-            # Checks for irregular activity from IP (Attempting to reach many sockets in short amount of time)
-            check_suspicious(src_ip)
-"""""
+        # ICMP ping flood detection
+        if packet.haslayer(ICMP) and packet[ICMP].type == 8:
+            # ICMP type 8 is echo request (Ping)
+            if len(packet) >= 1500:
+                if src_ip not in ping_of_death_ips:
+                    print("ICMP Ping of Death detected from source:", src_ip)
+                    send_email("ICMP Ping of Death detected from source: {0}".format(src_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                    ping_of_death_ips.append(src_ip)
+            else:
+                echo_requests.append(time.time())
+                if len(echo_requests) >= 10:
+                    time_difference = echo_requests[-1] - echo_requests[0]
+                    if time_difference <= 10:
+                        if src_ip not in ping_flood_ips:
+                            print("Possible ping flood detected")
+                            send_email("Possible ping flood detected from source: {0}".format(src_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                            ping_flood_ips.append(src_ip)
+       
+        elif packet.haslayer(TCP):
+            # TCP SYN flood detection
+            if packet[TCP].flags & 2:
+                if src_ip not in syn_packets:
+                    syn_packets[src_ip] = 1
+                else:
+                    syn_packets[src_ip] += 1
+                if syn_packets[src_ip] > 100:
+                    if src_ip not in tcp_syn_flood_ips:
+                        print("Possible TCP SYN flooding attack detected")
+                        send_email("Possible TCP SYN flooding attack detected from source: {0}".format(src_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                        tcp_syn_flood_ips.append(src_ip)
+
+        elif UDP in packet:
+            # UDP flood detection
+            if src_ip not in udp_flood_counts:
+                udp_flood_counts[src_ip] = 1
+            else:
+                udp_flood_counts[src_ip] += 1
+           
+            if udp_flood_counts[src_ip] > 100:
+                if src_ip not in udp_flood_ips:
+                    print("Possible UDP flood attack detected")
+                    send_email("Possible UDP flood attack detected from source: {0}".format(src_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                    udp_flood_ips.append(src_ip)
+
+
 # Initialize global variables
-packet_count = 0
-connection_attempts = {}
-last_check_time = time.time()
-ping_time = 10
+echo_requests = deque(maxlen=10)
 syn_packets = {}
-echo_requests = []
+tcp_reset_counts = {}
+ping_flood_ips = []
+tcp_syn_flood_ips = []
+ping_of_death_ips = []
+udp_flood_counts = {}
+udp_flood_ips = []
 
-# Create threads for each function
-#threading.Thread(target=sniff, kwargs={'prn': packet_callback, 'store': False}).start()
-threading.Thread(target=sniff, kwargs={'filter': "icmp", 'prn': detect_ping_flood}).start()
-threading.Thread(target=sniff, kwargs={'filter': "tcp", 'prn': detect_syn_flood}).start()
-threading.Thread(target=sniff, kwargs={'filter': "arp", 'prn': analyze_arp_packets}).start()
-threading.Thread(target=check_ddos).start()
+# Sniff all packets and call detect_attack for each packet
+sniff(prn=detect_attack)
