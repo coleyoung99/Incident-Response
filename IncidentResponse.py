@@ -7,9 +7,16 @@ from email.mime.multipart import MIMEMultipart
 from scapy.all import sniff, IP, TCP, UDP, ICMP, ARP
 import time
 
-def send_email(message, time_str):
+def read_credentials_from_file(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+        email = lines[0].strip()
+        password = lines[1].strip()
+    return email, password
+
+def send_email(message, time_str, sender_email, sender_password):
     msg = MIMEMultipart()
-    msg['From'] = "coleturneryoung2@gmail.com"
+    msg['From'] = sender_email
     msg['To'] = "coleturneryoung@gmail.com"
     msg['Subject'] = "Warning Irregular Activity - {}".format(time_str)
    
@@ -18,9 +25,9 @@ def send_email(message, time_str):
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        server.login("coleturneryoung2@gmail.com", "oxtu hwru wlhd uqvx")
+        server.login(sender_email, sender_password)
         text = msg.as_string()
-        server.sendmail("coleturneryoung2@gmail.com", "coleturneryoung@gmail.com", text)
+        server.sendmail(sender_email, "coleturneryoung@gmail.com", text)
        
         print("Email sent successfully!")
     except Exception as e:
@@ -37,11 +44,11 @@ def detect_attack(packet):
         target_ip = packet[IP].dst
 
         if packet.haslayer(ICMP) and packet[ICMP].type == 8:
-            # ICMP type 8 is echo request (Ping)
+            # ICMP ping of death detection
             if len(packet) >= 1500:
                 if src_ip not in ping_of_death_ips:
                     print("ICMP Ping of Death detected from source:", src_ip)
-                    send_email("ICMP Ping of Death detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                    send_email("ICMP Ping of Death detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"), sender_email, sender_password)
                     ping_of_death_ips.append(src_ip)
             else:
                 # ICMP ping flood detection
@@ -51,7 +58,7 @@ def detect_attack(packet):
                     if time_difference <= 10:
                         if src_ip not in ping_flood_ips:
                             print("Possible ping flood detected")
-                            send_email("Possible ping flood detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                            send_email("Possible ping flood detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"), sender_email, sender_password)
                             ping_flood_ips.append(src_ip)
        
         elif packet.haslayer(TCP):
@@ -64,7 +71,7 @@ def detect_attack(packet):
                 if syn_packets[src_ip] > 100:
                     if src_ip not in tcp_syn_flood_ips:
                         print("Possible TCP SYN flooding attack detected")
-                        send_email("Possible TCP SYN flooding attack detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                        send_email("Possible TCP SYN flooding attack detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"), sender_email, sender_password)
                         tcp_syn_flood_ips.append(src_ip)
 
         elif UDP in packet:
@@ -77,7 +84,7 @@ def detect_attack(packet):
             if udp_flood_counts[src_ip] > 100:
                 if src_ip not in udp_flood_ips:
                     print("Possible UDP flood attack detected")
-                    send_email("Possible UDP flood attack detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                    send_email("Possible UDP flood attack detected from source: {0}, Target IP: {1}".format(src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"), sender_email, sender_password)
                     udp_flood_ips.append(src_ip)
 
     # Check if packet contains ARP layer
@@ -90,7 +97,7 @@ def detect_attack(packet):
             if arp_responses[arp_src_ip] != arp_src_mac:
                 if arp_src_ip not in arp_ips:
                     print("Possible ARP spoofing detected for IP:", arp_src_ip)
-                    send_email("Possible ARP spoofing detected for IP: {0}, Target IP: {1}".format(arp_src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"))
+                    send_email("Possible ARP spoofing detected from  source: {0}, Target IP: {1}".format(arp_src_ip, target_ip), time.strftime("%Y-%m-%d %H:%M:%S"), sender_email, sender_password)
                     arp_ips.append(arp_src_ip)
         else:
             arp_responses[arp_src_ip] = arp_src_mac
@@ -107,5 +114,9 @@ udp_flood_counts = {}
 udp_flood_ips = []
 arp_responses = {}
 arp_ips = []
+
+# Read sender's email and password from file
+sender_email, sender_password = read_credentials_from_file("credentials.txt")
+
 # Sniff all packets and call detect_attack for each packet
 sniff(prn=detect_attack)
